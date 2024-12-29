@@ -1,0 +1,59 @@
+version: '3'
+services:
+  web:
+    build: .
+    command: /bin/bash -c "/usr/src/app/wait-for-postgres.sh"
+    volumes:
+      - .:/usr/src/app/
+    ports:
+      - 8000:8000
+    labels:
+      - "traefik.http.routers.web.rule=Host(`influencers.localhost`)"
+      - "traefik.port=8000"
+      - "traefik.http.services.web.loadbalancer.server.port=8000"
+    env_file:
+      - .env.dev
+    depends_on:
+      - postgres
+      - traefik
+
+  postgres:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=company
+    volumes:
+      - postgres:/var/lib/postgresql
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    labels:
+      - "traefik.http.routers.mailhog.rule=Host(`mailhog.localhost`)"
+      - "traefik.port=8025"
+      - "traefik.http.services.mailhog.loadbalancer.server.port=8025"
+    depends_on:
+      - traefik
+
+  traefik:
+    image: traefik:v2.9
+    command:
+      - --api.insecure=true
+      - --providers.docker
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "9000:8080"
+    labels:
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres:
